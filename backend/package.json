@@ -4,9 +4,10 @@
   "description": "CareVale Product Management API",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node src/config/migrate_all.js && node src/index.js",
     "dev": "nodemon src/index.js",
     "db:migrate": "node src/config/migrate.js",
+    "db:migrate:all": "node src/config/migrate_all.js",
     "db:seed": "node src/config/seed.js"
   },
   "dependencies": {
