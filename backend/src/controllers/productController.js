@@ -9,7 +9,7 @@ const getProducts = async (req, res, next) => {
 
     if (search) {
       params.push(`%${search}%`);
-      conds.push(`(p.product_name ILIKE $${params.length} OR p.product_id ILIKE $${params.length})`);
+      conds.push(`(p.product_name ILIKE $${params.length} OR p.product_id ILIKE $${params.length} OR p.sub_type ILIKE $${params.length})`);
     }
     if (category) { params.push(category); conds.push(`p.category = $${params.length}`); }
     if (low_stock === 'true') conds.push(`p.quantity <= 5`);
@@ -41,23 +41,23 @@ const getProduct = async (req, res, next) => {
 
 const createProduct = async (req, res, next) => {
   try {
-    const { product_name, product_id, product_cost, quantity, category, description } = req.body;
+    const { product_name, product_id, sub_type, product_cost, quantity, category, description } = req.body;
     const { rows } = await query(`
-      INSERT INTO products (product_name,product_id,product_cost,quantity,category,description,created_by,updated_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *
-    `, [product_name, product_id, product_cost, quantity, category||null, description||null, req.user.id]);
+      INSERT INTO products (product_name,product_id,sub_type,product_cost,quantity,category,description,created_by,updated_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) RETURNING *
+    `, [product_name, product_id, sub_type||null, product_cost, quantity, category||null, description||null, req.user.id]);
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
 };
 
 const updateProduct = async (req, res, next) => {
   try {
-    const { product_name, product_id, product_cost, quantity, category, description } = req.body;
+    const { product_name, product_id, sub_type, product_cost, quantity, category, description } = req.body;
     const { rows } = await query(`
-      UPDATE products SET product_name=$1,product_id=$2,product_cost=$3,
-        quantity=$4,category=$5,description=$6,updated_by=$7
-      WHERE id=$8 AND is_active=true RETURNING *
-    `, [product_name, product_id, product_cost, quantity, category||null, description||null, req.user.id, req.params.id]);
+      UPDATE products SET product_name=$1,product_id=$2,sub_type=$3,product_cost=$4,
+        quantity=$5,category=$6,description=$7,updated_by=$8
+      WHERE id=$9 AND is_active=true RETURNING *
+    `, [product_name, product_id, sub_type||null, product_cost, quantity, category||null, description||null, req.user.id, req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
     res.json(rows[0]);
   } catch (err) { next(err); }
