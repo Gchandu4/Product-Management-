@@ -1,12 +1,16 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { saleRequestsApi } from '../api/index.js';
 
-const TITLES = { '/dashboard':'Dashboard', '/products':'Products', '/categories':'Categories', '/stock':'Stock History' };
-const NAV = [
-  { to:'/dashboard',  icon:'◈', label:'Dashboard'    },
-  { to:'/products',   icon:'📦', label:'Products'     },
-  { to:'/categories', icon:'🏷', label:'Categories'   },
-  { to:'/stock',      icon:'📋', label:'Stock History' },
+const TITLES = { '/dashboard':'Dashboard', '/products':'Products', '/categories':'Categories', '/stock':'Stock History', '/requests':'Sale Requests' };
+
+const NAV_ALL = [
+  { to:'/dashboard',  icon:'◈', label:'Dashboard',     roles:['admin','staff','viewer'] },
+  { to:'/products',   icon:'📦', label:'Products',      roles:['admin','staff','viewer','reception'] },
+  { to:'/categories', icon:'🏷', label:'Categories',    roles:['admin','staff','viewer'] },
+  { to:'/stock',      icon:'📋', label:'Stock History', roles:['admin','staff','viewer'] },
+  { to:'/requests',   icon:'✅', label:'Sale Requests', roles:['admin','staff','reception'] },
 ];
 
 const s = {
@@ -29,6 +33,7 @@ const s = {
   topBar:  { height:56, padding:'0 28px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid var(--slate-200)', background:'var(--white)', flexShrink:0 },
   pageT:   { fontSize:16, fontWeight:500, color:'var(--slate-900)' },
   content: { flex:1, padding:'24px 28px', overflowY:'auto' },
+  badge:   { marginLeft:'auto', background:'var(--danger)', color:'#fff', fontSize:10, fontWeight:600, padding:'1px 6px', borderRadius:10, minWidth:16, textAlign:'center' },
 };
 
 export default function Layout() {
@@ -36,6 +41,15 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const initials = (user?.name || 'CV').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const NAV = NAV_ALL.filter(n => n.roles.includes(user?.role));
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      saleRequestsApi.getAll({ status:'pending' }).then(r => setPendingCount(r.data.pendingCount || 0)).catch(()=>{});
+    }
+  }, [user, location.pathname]);
 
   return (
     <div style={s.shell}>
@@ -49,6 +63,7 @@ export default function Layout() {
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} style={({isActive}) => s.navItem(isActive)}>
               <span style={{fontSize:15,width:18,textAlign:'center'}}>{n.icon}</span>{n.label}
+              {n.to==='/requests' && user?.role==='admin' && pendingCount>0 && <span style={s.badge}>{pendingCount}</span>}
             </NavLink>
           ))}
         </div>
@@ -72,3 +87,4 @@ export default function Layout() {
     </div>
   );
 }
+
