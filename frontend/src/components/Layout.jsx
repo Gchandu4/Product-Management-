@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { saleRequestsApi } from '../api/index.js';
 
-const TITLES = { '/dashboard':'Dashboard', '/products':'Products', '/categories':'Categories', '/stock':'Stock History', '/requests':'Sale Requests' };
+const TITLES = { '/dashboard':'Dashboard', '/products':'Products', '/categories':'Categories', '/stock':'Stock History', '/requests':'Sale Requests', '/users':'Staff Accounts' };
 
 const NAV_ALL = [
   { to:'/dashboard',  icon:'◈', label:'Dashboard',     roles:['admin','staff','viewer'] },
@@ -11,6 +11,7 @@ const NAV_ALL = [
   { to:'/categories', icon:'🏷', label:'Categories',    roles:['admin','staff','viewer'] },
   { to:'/stock',      icon:'📋', label:'Stock History', roles:['admin','staff','viewer'] },
   { to:'/requests',   icon:'✅', label:'Sale Requests', roles:['admin','staff','reception'] },
+  { to:'/users',      icon:'👥', label:'Staff Accounts',roles:['admin'] },
 ];
 
 const s = {
@@ -87,4 +88,5 @@ export default function Layout() {
     </div>
   );
 }
+
 
