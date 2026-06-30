@@ -7,10 +7,16 @@ import ProductsPage     from './pages/ProductsPage.jsx';
 import CategoriesPage   from './pages/CategoriesPage.jsx';
 import StockHistoryPage from './pages/StockHistoryPage.jsx';
 import SaleRequestsPage from './pages/SaleRequestsPage.jsx';
+import UsersPage        from './pages/UsersPage.jsx';
 
 const Private = ({ children }) => {
   const { user } = useAuth();
   return user ? children : <Navigate to="/login" replace />;
+};
+
+const AdminOnly = ({ children }) => {
+  const { user } = useAuth();
+  return user?.role === 'admin' ? children : <Navigate to="/products" replace />;
 };
 
 const HomeRedirect = () => {
@@ -32,6 +38,7 @@ export default function App() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="stock"      element={<StockHistoryPage />} />
           <Route path="requests"   element={<SaleRequestsPage />} />
+          <Route path="users"      element={<AdminOnly><UsersPage /></AdminOnly>} />
         </Route>
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
