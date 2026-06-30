@@ -19,9 +19,9 @@ const toCSV = (headers, rows) =>
 const today = () => new Date().toISOString().slice(0, 10);
 
 export const exportProducts = products => {
-  const headers = ['S.No','Product Name','Product ID','Category','Unit Cost (INR)','Quantity','Stock Value (INR)','Status'];
+  const headers = ['S.No','Product Name','Sub Type','Product ID','Category','Unit Cost (INR)','Quantity','Stock Value (INR)','Status'];
   const rows = products.map((p, i) => [
-    i + 1, p.product_name, p.product_id, p.category || '',
+    i + 1, p.product_name, p.sub_type || '', p.product_id, p.category || '',
     p.product_cost, p.quantity,
     (p.product_cost * p.quantity).toFixed(2),
     p.quantity === 0 ? 'Out of stock' : p.quantity <= 5 ? 'Low stock' : 'In stock',
@@ -42,3 +42,4 @@ export const exportStockHistory = adjustments => {
   });
   download(`CareVale_StockHistory_${today()}.csv`, toCSV(headers, rows));
 };
+
