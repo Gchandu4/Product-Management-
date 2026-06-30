@@ -33,3 +33,10 @@ export const stockApi = {
   getHistory: params   => api.get('/api/stock/history', { params }),
   adjust:     data     => api.post('/api/stock/adjust', data),
 };
+
+export const saleRequestsApi = {
+  getAll:  (params={}) => api.get('/api/sale-requests', { params }),
+  create:  data        => api.post('/api/sale-requests', data),
+  approve: (id, note)  => api.patch(`/api/sale-requests/${id}/approve`, { review_note: note }),
+  reject:  (id, note)  => api.patch(`/api/sale-requests/${id}/reject`, { review_note: note }),
+};
