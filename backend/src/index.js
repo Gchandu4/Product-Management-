@@ -10,6 +10,7 @@ const productRoutes     = require('./routes/products');
 const categoryRoutes    = require('./routes/categories');
 const stockRoutes       = require('./routes/stock');
 const saleRequestRoutes = require('./routes/saleRequests');
+const userRoutes        = require('./routes/users');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/products',      productRoutes);
 app.use('/api/categories',    categoryRoutes);
 app.use('/api/stock',         stockRoutes);
 app.use('/api/sale-requests', saleRequestRoutes);
+app.use('/api/users',         userRoutes);
 
 // 404
 app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }));
