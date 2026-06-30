@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const fmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
 const qStatus = q => q===0?'out':q<=5?'low':'ok';
-const EMPTY = { product_name:'', product_id:'', product_cost:'', quantity:'', category:'', description:'' };
+const EMPTY = { product_name:'', product_id:'', sub_type:'', product_cost:'', quantity:'', category:'', description:'' };
 
 const s = {
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 },
@@ -51,7 +51,7 @@ const s = {
 };
 
 function ProductModal({ product, categories, onClose, onSaved }) {
-  const [form, setForm] = useState(product ? { product_name:product.product_name, product_id:product.product_id, product_cost:product.product_cost, quantity:product.quantity, category:product.category||'', description:product.description||'' } : EMPTY);
+  const [form, setForm] = useState(product ? { product_name:product.product_name, product_id:product.product_id, sub_type:product.sub_type||'', product_cost:product.product_cost, quantity:product.quantity, category:product.category||'', description:product.description||'' } : EMPTY);
   const [errs, setErrs] = useState({});
   const [saving, setSaving] = useState(false);
   const set = (k,v) => { setForm(f=>({...f,[k]:v})); setErrs(e=>({...e,[k]:''})); };
@@ -85,6 +85,7 @@ function ProductModal({ product, categories, onClose, onSaved }) {
           <div style={s.formGrid}>
             <div style={s.formFull}><label style={s.fLabel}>Product name *</label><input style={s.fInput(errs.product_name)} value={form.product_name} onChange={e=>set('product_name',e.target.value)} placeholder="e.g. Below-Knee Prosthetic"/>{errs.product_name&&<div style={{...s.fHint,color:'var(--danger)'}}>{errs.product_name}</div>}</div>
             <div><label style={s.fLabel}>Product ID *</label><input style={s.fInput(errs.product_id)} value={form.product_id} onChange={e=>set('product_id',e.target.value)} placeholder="CV-PRO-001"/><div style={s.fHint}>Unique code</div></div>
+            <div><label style={s.fLabel}>Sub type</label><input style={s.fInput(false)} value={form.sub_type} onChange={e=>set('sub_type',e.target.value)} placeholder="e.g. Endoskeletal, SACH foot"/><div style={s.fHint}>Variant or model (optional)</div></div>
             <div><label style={s.fLabel}>Category</label><select style={s.fSelect} value={form.category} onChange={e=>set('category',e.target.value)}><option value="">Select…</option>{categories.map(c=><option key={c.id||c} value={c.name||c}>{c.name||c}</option>)}</select></div>
             <div><label style={s.fLabel}>Unit cost (₹) *</label><input type="number" min="0" step="0.01" style={s.fInput(errs.product_cost)} value={form.product_cost} onChange={e=>set('product_cost',e.target.value)} placeholder="0.00"/></div>
             <div><label style={s.fLabel}>Quantity *</label><input type="number" min="0" style={s.fInput(errs.quantity)} value={form.quantity} onChange={e=>set('quantity',e.target.value)} placeholder="0"/></div>
@@ -191,18 +192,19 @@ export default function ProductsPage() {
       <div style={s.tblWrap}>
         <table style={s.table}>
           <thead><tr>
-            {[['serial_no','S.No'],['product_name','Product name'],['product_id','Product ID'],['category','Category'],['product_cost','Unit cost'],['quantity','Qty']].map(([k,l])=>(
+            {[['serial_no','S.No'],['product_name','Product name'],['sub_type','Sub type'],['product_id','Product ID'],['category','Category'],['product_cost','Unit cost'],['quantity','Qty']].map(([k,l])=>(
               <th key={k} style={s.th} onClick={()=>sort(k)}>{l}{si(k)}</th>
             ))}
             <th style={s.th}>Actions</th>
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={7} style={{...s.td,textAlign:'center',padding:40,color:'var(--slate-400)'}}>Loading…</td></tr>
-            : sorted.length===0 ? <tr><td colSpan={7}><div style={s.empty}><div style={{fontSize:36,marginBottom:12}}>📦</div><div style={{fontSize:14,color:'var(--slate-500)',marginBottom:16}}>{search||catFilter?'No products match your filters.':'No products yet.'}</div>{canEdit&&!search&&!catFilter&&<button style={s.btnPri} onClick={()=>{setEditProd(null);setShowModal(true);}}>+ Add first product</button>}</div></td></tr>
+            {loading ? <tr><td colSpan={8} style={{...s.td,textAlign:'center',padding:40,color:'var(--slate-400)'}}>Loading…</td></tr>
+            : sorted.length===0 ? <tr><td colSpan={8}><div style={s.empty}><div style={{fontSize:36,marginBottom:12}}>📦</div><div style={{fontSize:14,color:'var(--slate-500)',marginBottom:16}}>{search||catFilter?'No products match your filters.':'No products yet.'}</div>{canEdit&&!search&&!catFilter&&<button style={s.btnPri} onClick={()=>{setEditProd(null);setShowModal(true);}}>+ Add first product</button>}</div></td></tr>
             : sorted.map((p,i) => (
                 <tr key={p.id} style={{background:hovered===p.id?'var(--slate-50)':'var(--white)'}} onMouseEnter={()=>setHovered(p.id)} onMouseLeave={()=>setHovered(null)}>
                   <td style={{...s.td,color:'var(--slate-400)',width:50}}>{i+1}</td>
                   <td style={{...s.td,fontWeight:500}}>{p.product_name}</td>
+                  <td style={s.td}>{p.sub_type?<span style={{fontSize:12,color:'var(--slate-600)'}}>{p.sub_type}</span>:<span style={{color:'var(--slate-300)'}}>—</span>}</td>
                   <td style={s.td}><span style={s.pidBadge}>{p.product_id}</span></td>
                   <td style={s.td}>{p.category?<span style={s.catBadge}>{p.category}</span>:<span style={{color:'var(--slate-300)'}}>—</span>}</td>
                   <td style={{...s.td,fontWeight:500}}>{fmt(p.product_cost)}</td>
@@ -230,3 +232,4 @@ export default function ProductsPage() {
     </>
   );
 }
+
