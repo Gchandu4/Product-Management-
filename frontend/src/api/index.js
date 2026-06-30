@@ -40,3 +40,11 @@ export const saleRequestsApi = {
   approve: (id, note)  => api.patch(`/api/sale-requests/${id}/approve`, { review_note: note }),
   reject:  (id, note)  => api.patch(`/api/sale-requests/${id}/reject`, { review_note: note }),
 };
+
+export const usersApi = {
+  getAll:        ()          => api.get('/api/users'),
+  create:        data        => api.post('/api/users', data),
+  update:        (id, data)  => api.put(`/api/users/${id}`, data),
+  resetPassword: (id, pwd)   => api.patch(`/api/users/${id}/password`, { password: pwd }),
+  delete:        id          => api.delete(`/api/users/${id}`),
+};
