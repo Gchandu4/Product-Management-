@@ -5,10 +5,11 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-const authRoutes     = require('./routes/auth');
-const productRoutes  = require('./routes/products');
-const categoryRoutes = require('./routes/categories');
-const stockRoutes    = require('./routes/stock');
+const authRoutes        = require('./routes/auth');
+const productRoutes     = require('./routes/products');
+const categoryRoutes    = require('./routes/categories');
+const stockRoutes       = require('./routes/stock');
+const saleRequestRoutes = require('./routes/saleRequests');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -43,10 +44,11 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.get('/health', (_req, res) =>
   res.json({ status: 'ok', service: 'carevale-api', ts: new Date().toISOString() })
 );
-app.use('/api/auth',       authRoutes);
-app.use('/api/products',   productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/stock',      stockRoutes);
+app.use('/api/auth',          authRoutes);
+app.use('/api/products',      productRoutes);
+app.use('/api/categories',    categoryRoutes);
+app.use('/api/stock',         stockRoutes);
+app.use('/api/sale-requests', saleRequestRoutes);
 
 // 404
 app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }));
