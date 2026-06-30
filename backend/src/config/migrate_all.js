@@ -121,6 +121,46 @@ const main = async () => {
     await client.query('COMMIT');
   });
 
+  // ── Sale requests (Reception → Admin approval workflow) ────────────────────
+  await run('Sale requests table + reception role', async () => {
+    await client.query('BEGIN');
+
+    // Allow 'reception' as a valid role
+    await client.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`);
+    await client.query(`
+      ALTER TABLE users ADD CONSTRAINT users_role_check
+      CHECK (role IN ('admin','staff','viewer','reception'));
+    `);
+
+    await client.query(`CREATE SEQUENCE IF NOT EXISTS sale_request_seq START 1001;`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sale_requests (
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        request_no      VARCHAR(30) UNIQUE NOT NULL DEFAULT ('REQ-' || TO_CHAR(NOW(),'YYYY') || '-' || LPAD(nextval('sale_request_seq')::TEXT,4,'0')),
+        product_id      UUID NOT NULL REFERENCES products(id),
+        product_name    VARCHAR(200) NOT NULL,
+        product_code    VARCHAR(50)  NOT NULL,
+        quantity        INTEGER NOT NULL CHECK (quantity > 0),
+        patient_name    VARCHAR(150),
+        patient_phone   VARCHAR(20),
+        reason          TEXT,
+        status          VARCHAR(20) NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','approved','rejected')),
+        requested_by    UUID REFERENCES users(id),
+        reviewed_by     UUID REFERENCES users(id),
+        review_note     TEXT,
+        requested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        reviewed_at     TIMESTAMPTZ
+      );
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sale_req_status ON sale_requests(status);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sale_req_product ON sale_requests(product_id);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_sale_req_requested ON sale_requests(requested_at DESC);`);
+
+    await client.query('COMMIT');
+  });
+
   // ── Seed (only inserts if not already present — safe to repeat) ───────────
   await run('Seed default admin + sample data', async () => {
     const bcrypt = require('bcryptjs');
@@ -157,3 +197,4 @@ const main = async () => {
 };
 
 main().catch(err => { console.error('Migration runner failed:', err); process.exit(1); });
+
