@@ -14,6 +14,13 @@ export const productsApi = {
   delete:   id            => api.delete(`/api/products/${id}`),
 };
 
+export const subtypesApi = {
+  getAll: productId            => api.get(`/api/products/${productId}/subtypes`),
+  create: (productId, data)    => api.post(`/api/products/${productId}/subtypes`, data),
+  update: (productId, id, data)=> api.put(`/api/products/${productId}/subtypes/${id}`, data),
+  delete: (productId, id)      => api.delete(`/api/products/${productId}/subtypes/${id}`),
+};
+
 export const categoriesApi = {
   getAll:  ()         => api.get('/api/categories'),
   create:  data       => api.post('/api/categories', data),
