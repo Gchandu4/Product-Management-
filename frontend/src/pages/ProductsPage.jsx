@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { productsApi, categoriesApi } from '../api/index.js';
+import { productsApi, categoriesApi, subtypesApi } from '../api/index.js';
 import { exportProducts } from '../utils/csvExport.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const fmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
 const qStatus = q => q===0?'out':q<=5?'low':'ok';
-const EMPTY = { product_name:'', product_id:'', sub_type:'', product_cost:'', quantity:'', category:'', description:'' };
+const EMPTY = { product_name:'', product_id:'', product_cost:'', quantity:'', category:'', description:'' };
+const EMPTY_SUB = { name:'', sub_code:'', unit_cost:'', quantity:'' };
 
 const s = {
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 },
@@ -26,12 +27,13 @@ const s = {
   qBadge:    st => ({ display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'2px 10px', borderRadius:20, fontSize:12, fontWeight:500, minWidth:40, background:st==='out'?'var(--danger-bg)':st==='low'?'var(--warning-bg)':'var(--success-bg)', color:st==='out'?'var(--danger)':st==='low'?'var(--warning)':'var(--success)' }),
   pidBadge:  { fontFamily:'var(--mono)', fontSize:11, padding:'2px 7px', background:'var(--slate-100)', borderRadius:'var(--radius-sm)', color:'var(--slate-600)' },
   catBadge:  { fontSize:11, padding:'2px 8px', borderRadius:20, background:'var(--teal-50)', color:'var(--teal-700)', fontWeight:500 },
+  partsBadge:{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, padding:'3px 9px', borderRadius:20, background:'#eeedfe', color:'#533AB7', fontWeight:500, cursor:'pointer', border:'1px solid transparent' },
   actBtn:    { background:'transparent', border:'1px solid var(--slate-200)', borderRadius:'var(--radius-sm)', padding:'4px 10px', fontSize:12, color:'var(--slate-600)', cursor:'pointer' },
   delBtn:    { background:'transparent', border:'1px solid rgba(226,75,74,.3)', borderRadius:'var(--radius-sm)', padding:'4px 10px', fontSize:12, color:'var(--danger)', cursor:'pointer' },
   foot:      { padding:'10px 14px', display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--slate-500)', borderTop:'1px solid var(--slate-100)', background:'var(--slate-50)' },
   empty:     { padding:'48px 20px', textAlign:'center', color:'var(--slate-400)' },
-  backdrop:  { position:'fixed', inset:0, background:'rgba(15,25,35,.5)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:20 },
-  modal:     { background:'var(--white)', borderRadius:'var(--radius-xl)', width:'100%', maxWidth:460, boxShadow:'var(--shadow-lg)', overflow:'hidden' },
+  backdrop:  { position:'fixed', inset:0, background:'rgba(15,25,35,.5)', zIndex:100, display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'24px 20px', overflowY:'auto' },
+  modal:     { background:'var(--white)', borderRadius:'var(--radius-xl)', width:'100%', maxWidth:560, boxShadow:'var(--shadow-lg)', overflow:'hidden', margin:'auto' },
   mHead:     { padding:'18px 22px 14px', borderBottom:'1px solid var(--slate-100)', display:'flex', justifyContent:'space-between', alignItems:'center' },
   mTitle:    { fontSize:15, fontWeight:500, color:'var(--slate-900)' },
   mClose:    { background:'none', border:'none', fontSize:20, color:'var(--slate-400)', cursor:'pointer' },
@@ -42,19 +44,116 @@ const s = {
   fInput:    err => ({ width:'100%', height:37, padding:'0 11px', fontSize:13, background:'var(--white)', border:`1px solid ${err?'var(--danger)':'var(--slate-200)'}`, borderRadius:'var(--radius-md)', color:'var(--slate-800)', outline:'none' }),
   fSelect:   { width:'100%', height:37, padding:'0 11px', fontSize:13, background:'var(--white)', border:'1px solid var(--slate-200)', borderRadius:'var(--radius-md)', color:'var(--slate-800)', outline:'none' },
   fHint:     { fontSize:11, color:'var(--slate-400)', marginTop:3 },
-  mFoot:     { padding:'14px 22px', borderBottom:'none', borderTop:'1px solid var(--slate-100)', display:'flex', justifyContent:'flex-end', gap:8 },
+  mFoot:     { padding:'14px 22px', borderTop:'1px solid var(--slate-100)', display:'flex', justifyContent:'flex-end', gap:8 },
   btnCancel: { height:36, padding:'0 14px', background:'transparent', border:'1px solid var(--slate-200)', borderRadius:'var(--radius-md)', color:'var(--slate-600)', fontSize:13, cursor:'pointer' },
   btnSave:   { height:36, padding:'0 18px', background:'var(--teal-600)', border:'none', borderRadius:'var(--radius-md)', color:'var(--white)', fontSize:13, fontWeight:500, cursor:'pointer' },
   btnDanger: { height:36, padding:'0 16px', background:'var(--danger)', border:'none', borderRadius:'var(--radius-md)', color:'var(--white)', fontSize:13, fontWeight:500, cursor:'pointer' },
   toast:     show => ({ position:'fixed', bottom:22, right:22, zIndex:200, padding:'11px 16px', borderRadius:'var(--radius-md)', fontSize:13, fontWeight:500, boxShadow:'var(--shadow-lg)', display:'flex', alignItems:'center', gap:8, background:'var(--slate-900)', color:'var(--white)', opacity:show?1:0, transform:show?'translateY(0)':'translateY(8px)', transition:'all .2s', pointerEvents:show?'auto':'none' }),
   delModal:  { background:'var(--white)', borderRadius:'var(--radius-lg)', width:'100%', maxWidth:340, padding:22, boxShadow:'var(--shadow-lg)' },
+  subSection:{ marginTop:18, paddingTop:16, borderTop:'1px solid var(--slate-100)' },
+  subHeadRow:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 },
+  subTitle:  { fontSize:12, fontWeight:600, color:'var(--slate-600)', textTransform:'uppercase', letterSpacing:'.06em' },
+  subAddBtn: { fontSize:12, color:'var(--teal-600)', background:'transparent', border:'1px solid var(--teal-200)', borderRadius:'var(--radius-sm)', padding:'4px 10px', cursor:'pointer', fontWeight:500 },
+  subRow:    { display:'grid', gridTemplateColumns:'1fr 90px 90px 32px', gap:6, marginBottom:6, alignItems:'center' },
+  subInput:  { height:32, padding:'0 9px', fontSize:12, background:'var(--white)', border:'1px solid var(--slate-200)', borderRadius:'var(--radius-sm)', color:'var(--slate-800)', outline:'none', width:'100%' },
+  subRemove: { width:28, height:28, background:'transparent', border:'1px solid rgba(226,75,74,.3)', borderRadius:'var(--radius-sm)', color:'var(--danger)', cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' },
+  subEmpty:  { fontSize:12, color:'var(--slate-400)', padding:'8px 0' },
+  subSummary:{ display:'flex', justifyContent:'space-between', marginTop:10, padding:'8px 10px', background:'var(--teal-50)', borderRadius:'var(--radius-sm)', fontSize:12, color:'var(--teal-700)' },
+  subLabelHint: { fontSize:10, color:'var(--slate-400)', marginTop:4 },
+  detailModal: { background:'var(--white)', borderRadius:'var(--radius-xl)', width:'100%', maxWidth:480, boxShadow:'var(--shadow-lg)', margin:'auto' },
+  detRow:    { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--slate-100)', fontSize:13 },
 };
 
+function SubtypeEditor({ productId, subtypes, onChange }) {
+  const [rows, setRows] = useState(subtypes || []);
+
+  useEffect(() => { setRows(subtypes || []); }, [subtypes]);
+
+  const addRow = () => setRows(r => [...r, { ...EMPTY_SUB, _key: Date.now() }]);
+
+  const updateLocal = (idx, key, val) => {
+    setRows(r => r.map((row,i) => i===idx ? { ...row, [key]: val } : row));
+  };
+
+  const removeRow = async (idx) => {
+    const row = rows[idx];
+    if (row.id && productId) {
+      await subtypesApi.delete(productId, row.id);
+      onChange();
+    }
+    setRows(r => r.filter((_,i) => i!==idx));
+  };
+
+  const commitRow = async (idx) => {
+    const row = rows[idx];
+    if (!row.name?.trim() || !productId) return;
+    const payload = { name:row.name, sub_code:row.sub_code, unit_cost:Number(row.unit_cost)||0, quantity:Number(row.quantity)||0 };
+    if (row.id) await subtypesApi.update(productId, row.id, payload);
+    else {
+      const res = await subtypesApi.create(productId, payload);
+      setRows(r => r.map((rr,i) => i===idx ? { ...rr, id: res.data.subtype.id } : rr));
+    }
+    onChange();
+  };
+
+  const totalCost = rows.reduce((sum,r) => sum + (Number(r.unit_cost)||0), 0);
+  const minQty    = rows.length ? Math.min(...rows.map(r => Number(r.quantity)||0)) : 0;
+
+  return (
+    <div style={s.subSection}>
+      <div style={s.subHeadRow}>
+        <span style={s.subTitle}>Sub-types / components</span>
+        <button style={s.subAddBtn} onClick={addRow} type="button" disabled={!productId}>+ Add part</button>
+      </div>
+      {!productId && <div style={s.subEmpty}>Save the product first, then add its sub-type components here.</div>}
+      {productId && rows.length===0 && <div style={s.subEmpty}>No components yet. This product is standalone (no parts).</div>}
+      {productId && rows.map((row, idx) => (
+        <div key={row.id || row._key} style={s.subRow}>
+          <input style={s.subInput} placeholder="Part name (e.g. Socket)" value={row.name}
+            onChange={e=>updateLocal(idx,'name',e.target.value)}
+            onBlur={()=>commitRow(idx)} />
+          <input style={s.subInput} type="number" min="0" step="0.01" placeholder="Cost ₹" value={row.unit_cost}
+            onChange={e=>updateLocal(idx,'unit_cost',e.target.value)}
+            onBlur={()=>commitRow(idx)} />
+          <input style={s.subInput} type="number" min="0" placeholder="Qty" value={row.quantity}
+            onChange={e=>updateLocal(idx,'quantity',e.target.value)}
+            onBlur={()=>commitRow(idx)} />
+          <button style={s.subRemove} onClick={()=>removeRow(idx)} type="button" title="Remove part">×</button>
+        </div>
+      ))}
+      {productId && rows.length>0 && (
+        <div style={s.subSummary}>
+          <span>{rows.length} part{rows.length!==1?'s':''} · Combined cost: {fmt(totalCost)}</span>
+          <span>Assembly stock: {minQty} (lowest part qty)</span>
+        </div>
+      )}
+      <div style={s.subLabelHint}>The parent product's cost and quantity are calculated automatically from its parts.</div>
+    </div>
+  );
+}
+
 function ProductModal({ product, categories, onClose, onSaved }) {
-  const [form, setForm] = useState(product ? { product_name:product.product_name, product_id:product.product_id, sub_type:product.sub_type||'', product_cost:product.product_cost, quantity:product.quantity, category:product.category||'', description:product.description||'' } : EMPTY);
+  const [form, setForm] = useState(product ? { product_name:product.product_name, product_id:product.product_id, product_cost:product.product_cost, quantity:product.quantity, category:product.category||'', description:product.description||'' } : EMPTY);
   const [errs, setErrs] = useState({});
   const [saving, setSaving] = useState(false);
+  const [savedProduct, setSavedProduct] = useState(product || null);
+  const [subtypes, setSubtypes] = useState([]);
   const set = (k,v) => { setForm(f=>({...f,[k]:v})); setErrs(e=>({...e,[k]:''})); };
+
+  useEffect(() => {
+    if (savedProduct?.id) subtypesApi.getAll(savedProduct.id).then(r=>setSubtypes(r.data));
+  }, [savedProduct?.id]);
+
+  const refreshSubtypes = async () => {
+    if (!savedProduct?.id) return;
+    const [subsRes, prodRes] = await Promise.all([
+      subtypesApi.getAll(savedProduct.id),
+      productsApi.getOne(savedProduct.id),
+    ]);
+    setSubtypes(subsRes.data);
+    setSavedProduct(prodRes.data);
+    setForm(f => ({ ...f, product_cost: prodRes.data.product_cost, quantity: prodRes.data.quantity }));
+  };
 
   const validate = () => {
     const e = {};
@@ -70,31 +169,46 @@ function ProductModal({ product, categories, onClose, onSaved }) {
     setSaving(true);
     try {
       const payload = {...form, product_cost:Number(form.product_cost), quantity:Number(form.quantity)};
-      const res = product ? await productsApi.update(product.id, payload) : await productsApi.create(payload);
-      onSaved(res.data, !product); onClose();
+      const res = savedProduct ? await productsApi.update(savedProduct.id, payload) : await productsApi.create(payload);
+      setSavedProduct(res.data);
+      onSaved(res.data, !savedProduct);
+      if (savedProduct) onClose();
     } catch (err) { setErrs({_: err.response?.data?.error||'Save failed.'}); }
     finally { setSaving(false); }
   };
 
+  const isAssembly = subtypes.length > 0;
+
   return (
     <div style={s.backdrop} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={s.modal}>
-        <div style={s.mHead}><div style={s.mTitle}>{product?'Edit product':'Add product'}</div><button style={s.mClose} onClick={onClose}>×</button></div>
+        <div style={s.mHead}><div style={s.mTitle}>{savedProduct?'Edit product':'Add product'}</div><button style={s.mClose} onClick={onClose}>×</button></div>
         <div style={s.mBody}>
           {errs._&&<div style={{fontSize:12,color:'var(--danger)',marginBottom:12,padding:'8px 12px',background:'var(--danger-bg)',borderRadius:6}}>{errs._}</div>}
           <div style={s.formGrid}>
             <div style={s.formFull}><label style={s.fLabel}>Product name *</label><input style={s.fInput(errs.product_name)} value={form.product_name} onChange={e=>set('product_name',e.target.value)} placeholder="e.g. Below-Knee Prosthetic"/>{errs.product_name&&<div style={{...s.fHint,color:'var(--danger)'}}>{errs.product_name}</div>}</div>
             <div><label style={s.fLabel}>Product ID *</label><input style={s.fInput(errs.product_id)} value={form.product_id} onChange={e=>set('product_id',e.target.value)} placeholder="CV-PRO-001"/><div style={s.fHint}>Unique code</div></div>
-            <div><label style={s.fLabel}>Sub type</label><input style={s.fInput(false)} value={form.sub_type} onChange={e=>set('sub_type',e.target.value)} placeholder="e.g. Endoskeletal, SACH foot"/><div style={s.fHint}>Variant or model (optional)</div></div>
             <div><label style={s.fLabel}>Category</label><select style={s.fSelect} value={form.category} onChange={e=>set('category',e.target.value)}><option value="">Select…</option>{categories.map(c=><option key={c.id||c} value={c.name||c}>{c.name||c}</option>)}</select></div>
-            <div><label style={s.fLabel}>Unit cost (₹) *</label><input type="number" min="0" step="0.01" style={s.fInput(errs.product_cost)} value={form.product_cost} onChange={e=>set('product_cost',e.target.value)} placeholder="0.00"/></div>
-            <div><label style={s.fLabel}>Quantity *</label><input type="number" min="0" style={s.fInput(errs.quantity)} value={form.quantity} onChange={e=>set('quantity',e.target.value)} placeholder="0"/></div>
+            <div>
+              <label style={s.fLabel}>Unit cost (₹) *</label>
+              <input type="number" min="0" step="0.01" style={s.fInput(errs.product_cost)} value={form.product_cost} onChange={e=>set('product_cost',e.target.value)} placeholder="0.00" disabled={isAssembly}/>
+              {isAssembly && <div style={s.fHint}>Auto-calculated from {subtypes.length} part{subtypes.length!==1?'s':''}</div>}
+            </div>
+            <div>
+              <label style={s.fLabel}>Quantity *</label>
+              <input type="number" min="0" style={s.fInput(errs.quantity)} value={form.quantity} onChange={e=>set('quantity',e.target.value)} placeholder="0" disabled={isAssembly}/>
+              {isAssembly && <div style={s.fHint}>= lowest part quantity</div>}
+            </div>
             <div style={s.formFull}><label style={s.fLabel}>Description</label><input style={s.fInput(false)} value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Optional notes"/></div>
           </div>
+
+          <SubtypeEditor productId={savedProduct?.id} subtypes={subtypes} onChange={refreshSubtypes} />
         </div>
         <div style={s.mFoot}>
-          <button style={s.btnCancel} onClick={onClose}>Cancel</button>
-          <button style={{...s.btnSave,opacity:saving?.7:1}} onClick={save} disabled={saving}>{saving?'Saving…':product?'Save changes':'Add product'}</button>
+          <button style={s.btnCancel} onClick={onClose}>{savedProduct?'Close':'Cancel'}</button>
+          <button style={{...s.btnSave,opacity:saving?.7:1}} onClick={save} disabled={saving}>
+            {saving?'Saving…':savedProduct?'Save changes':'Add product & continue'}
+          </button>
         </div>
       </div>
     </div>
@@ -108,10 +222,47 @@ function DeleteModal({ product, onClose, onConfirm }) {
     <div style={s.backdrop} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={s.delModal}>
         <div style={{fontSize:15,fontWeight:500,marginBottom:8}}>Delete product?</div>
-        <div style={{fontSize:13,color:'var(--slate-500)',marginBottom:18,lineHeight:1.5}}><strong>{product.product_name}</strong> ({product.product_id}) will be removed permanently.</div>
+        <div style={{fontSize:13,color:'var(--slate-500)',marginBottom:18,lineHeight:1.5}}><strong>{product.product_name}</strong> ({product.product_id}) and all its parts will be removed permanently.</div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
           <button style={s.btnCancel} onClick={onClose}>Cancel</button>
           <button style={{...s.btnDanger,opacity:del?.7:1}} onClick={go} disabled={del}>{del?'Deleting…':'Delete'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PartsViewer({ product, onClose, onEdit }) {
+  const [subtypes, setSubtypes] = useState(null);
+  useEffect(() => { subtypesApi.getAll(product.id).then(r=>setSubtypes(r.data)); }, [product.id]);
+
+  return (
+    <div style={s.backdrop} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={s.detailModal}>
+        <div style={s.mHead}>
+          <div>
+            <div style={s.mTitle}>{product.product_name}</div>
+            <div style={{fontSize:11,color:'var(--slate-400)',marginTop:2}}>{product.product_id} — components</div>
+          </div>
+          <button style={s.mClose} onClick={onClose}>×</button>
+        </div>
+        <div style={s.mBody}>
+          {subtypes===null ? <div style={{color:'var(--slate-400)',fontSize:13,padding:'10px 0'}}>Loading…</div>
+          : subtypes.length===0 ? <div style={{color:'var(--slate-400)',fontSize:13,padding:'10px 0'}}>No parts recorded.</div>
+          : subtypes.map(st => (
+              <div key={st.id} style={s.detRow}>
+                <span style={{fontWeight:500}}>{st.name}</span>
+                <span style={{display:'flex',gap:16,color:'var(--slate-500)'}}>
+                  <span>{fmt(st.unit_cost)}</span>
+                  <span style={s.qBadge(qStatus(st.quantity))}>{st.quantity}</span>
+                </span>
+              </div>
+            ))
+          }
+        </div>
+        <div style={s.mFoot}>
+          <button style={s.btnCancel} onClick={onClose}>Close</button>
+          <button style={s.btnSave} onClick={()=>onEdit(product)}>Edit parts</button>
         </div>
       </div>
     </div>
@@ -134,6 +285,7 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editProd,  setEditProd]  = useState(null);
   const [delProd,   setDelProd]   = useState(null);
+  const [partsProd, setPartsProd] = useState(null);
   const [hovered,   setHovered]   = useState(null);
   const [toast,     setToast]     = useState({show:false,msg:''});
 
@@ -192,7 +344,7 @@ export default function ProductsPage() {
       <div style={s.tblWrap}>
         <table style={s.table}>
           <thead><tr>
-            {[['serial_no','S.No'],['product_name','Product name'],['sub_type','Sub type'],['product_id','Product ID'],['category','Category'],['product_cost','Unit cost'],['quantity','Qty']].map(([k,l])=>(
+            {[['serial_no','S.No'],['product_name','Product name'],['subtype_count','Sub type'],['product_id','Product ID'],['category','Category'],['product_cost','Unit cost'],['quantity','Qty']].map(([k,l])=>(
               <th key={k} style={s.th} onClick={()=>sort(k)}>{l}{si(k)}</th>
             ))}
             <th style={s.th}>Actions</th>
@@ -204,7 +356,12 @@ export default function ProductsPage() {
                 <tr key={p.id} style={{background:hovered===p.id?'var(--slate-50)':'var(--white)'}} onMouseEnter={()=>setHovered(p.id)} onMouseLeave={()=>setHovered(null)}>
                   <td style={{...s.td,color:'var(--slate-400)',width:50}}>{i+1}</td>
                   <td style={{...s.td,fontWeight:500}}>{p.product_name}</td>
-                  <td style={s.td}>{p.sub_type?<span style={{fontSize:12,color:'var(--slate-600)'}}>{p.sub_type}</span>:<span style={{color:'var(--slate-300)'}}>—</span>}</td>
+                  <td style={s.td}>
+                    {Number(p.subtype_count) > 0
+                      ? <span style={s.partsBadge} onClick={()=>setPartsProd(p)}>{p.subtype_count} part{p.subtype_count!=='1'?'s':''} ▾</span>
+                      : <span style={{color:'var(--slate-300)'}}>—</span>
+                    }
+                  </td>
                   <td style={s.td}><span style={s.pidBadge}>{p.product_id}</span></td>
                   <td style={s.td}>{p.category?<span style={s.catBadge}>{p.category}</span>:<span style={{color:'var(--slate-300)'}}>—</span>}</td>
                   <td style={{...s.td,fontWeight:500}}>{fmt(p.product_cost)}</td>
@@ -226,10 +383,10 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {showModal&&<ProductModal product={editProd} categories={categories} onClose={()=>{setShowModal(false);setEditProd(null);}} onSaved={handleSaved}/>}
+      {showModal&&<ProductModal product={editProd} categories={categories} onClose={()=>{setShowModal(false);setEditProd(null);load();}} onSaved={handleSaved}/>}
       {delProd&&<DeleteModal product={delProd} onClose={()=>setDelProd(null)} onConfirm={handleDelete}/>}
+      {partsProd&&<PartsViewer product={partsProd} onClose={()=>setPartsProd(null)} onEdit={p=>{setPartsProd(null);setEditProd(p);setShowModal(true);}}/>}
       <div style={s.toast(toast.show)}><span style={{color:'var(--teal-400)'}}>✓</span>{toast.msg}</div>
     </>
   );
 }
-
