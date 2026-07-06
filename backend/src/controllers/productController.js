@@ -53,10 +53,13 @@ const getProduct = async (req, res, next) => {
 const createProduct = async (req, res, next) => {
   try {
     const { product_name, product_id, product_cost, quantity, category, description } = req.body;
+    if (!product_name || !product_id)
+      return res.status(400).json({ error: 'Product name and ID are required.' });
+
     const { rows } = await query(`
-      INSERT INTO products (product_name,product_id,product_cost,quantity,category,description,created_by,updated_by)
+      INSERT INTO products (product_name, product_id, product_cost, quantity, category, description, created_by, updated_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$7) RETURNING *
-    `, [product_name, product_id, product_cost, quantity, category||null, description||null, req.user.id]);
+    `, [product_name, product_id, product_cost || 0, quantity || 0, category || null, description || null, req.user.id]);
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
 };
@@ -65,19 +68,34 @@ const updateProduct = async (req, res, next) => {
   try {
     const { product_name, product_id, product_cost, quantity, category, description } = req.body;
 
-    // If this product is an assembly (has sub-types), quantity/cost are derived
-    // and should NOT be hand-edited here — they get overwritten by recomputeParent().
-    // We still allow editing name/id/category/description freely.
-    const { rows: [existing] } = await query(`SELECT is_assembly FROM products WHERE id=$1`, [req.params.id]);
-    const isAssembly = existing?.is_assembly;
+    // Check if this is an assembly — if yes, don't overwrite derived cost/quantity
+    const { rows: [existing] } = await query(
+      `SELECT is_assembly FROM products WHERE id=$1 AND is_active=true`,
+      [req.params.id]
+    );
+    if (!existing) return res.status(404).json({ error: 'Product not found.' });
 
-    const { rows } = await query(`
-      UPDATE products SET product_name=$1,product_id=$2,
-        product_cost = CASE WHEN $9 THEN product_cost ELSE $3 END,
-        quantity     = CASE WHEN $9 THEN quantity     ELSE $4 END,
-        category=$5,description=$6,updated_by=$7
-      WHERE id=$8 AND is_active=true RETURNING *
-    `, [product_name, product_id, product_cost, quantity, category||null, description||null, req.user.id, req.params.id, isAssembly]);
+    let rows;
+    if (existing.is_assembly) {
+      // Assembly: only update name, id, category, description — cost+qty are computed from parts
+      const result = await query(`
+        UPDATE products
+        SET product_name=$1, product_id=$2, category=$3, description=$4, updated_by=$5
+        WHERE id=$6 AND is_active=true RETURNING *
+      `, [product_name, product_id, category || null, description || null, req.user.id, req.params.id]);
+      rows = result.rows;
+    } else {
+      // Standalone: update everything
+      const result = await query(`
+        UPDATE products
+        SET product_name=$1, product_id=$2, product_cost=$3, quantity=$4,
+            category=$5, description=$6, updated_by=$7
+        WHERE id=$8 AND is_active=true RETURNING *
+      `, [product_name, product_id, product_cost || 0, quantity || 0,
+          category || null, description || null, req.user.id, req.params.id]);
+      rows = result.rows;
+    }
+
     if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
     res.json(rows[0]);
   } catch (err) { next(err); }
@@ -86,7 +104,7 @@ const updateProduct = async (req, res, next) => {
 const deleteProduct = async (req, res, next) => {
   try {
     const { rows } = await query(
-      `UPDATE products SET is_active=false,updated_by=$1 WHERE id=$2 RETURNING id`,
+      `UPDATE products SET is_active=false, updated_by=$1 WHERE id=$2 RETURNING id`,
       [req.user.id, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Product not found.' });
@@ -98,9 +116,9 @@ const getStats = async (req, res, next) => {
   try {
     const { rows: [stats] } = await query(`
       SELECT
-        COUNT(*)                                               AS total_products,
-        COALESCE(SUM(product_cost * quantity), 0)             AS total_value,
-        COUNT(*) FILTER (WHERE quantity = 0)                  AS out_of_stock,
+        COUNT(*)                                                AS total_products,
+        COALESCE(SUM(product_cost * quantity), 0)              AS total_value,
+        COUNT(*) FILTER (WHERE quantity = 0)                   AS out_of_stock,
         COUNT(*) FILTER (WHERE quantity > 0 AND quantity <= 5) AS low_stock,
         COUNT(DISTINCT category)                               AS categories
       FROM products WHERE is_active = true
