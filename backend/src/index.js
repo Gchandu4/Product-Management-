@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
+const cors    = require('cors');
+const helmet  = require('helmet');
+const morgan  = require('morgan');
 const rateLimit = require('express-rate-limit');
 
 const authRoutes        = require('./routes/auth');
@@ -11,18 +11,39 @@ const categoryRoutes    = require('./routes/categories');
 const stockRoutes       = require('./routes/stock');
 const saleRequestRoutes = require('./routes/saleRequests');
 const userRoutes        = require('./routes/users');
-const { errorHandler } = require('./middleware/errorHandler');
+const { errorHandler }  = require('./middleware/errorHandler');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 4000;
 
-// ── Security ──────────────────────────────────────────────────────────────────
-app.use(helmet());
+// ── CORS ──────────────────────────────────────────────────────────────────────
+// Always allow these known CareVale origins
+const HARDCODED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://product-management-1-9h7u.onrender.com',
+  'https://product-management-1xjp.onrender.com',
+  'https://carevale-frontend.onrender.com',
+];
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
+// Also accept any additional origins from the environment variable
+const ENV_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
+
+app.use(helmet());
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow server-to-server requests (no origin)
+    if (!origin) return cb(null, true);
+    // Allow any onrender.com subdomain (covers URL changes automatically)
+    if (origin.endsWith('.onrender.com')) return cb(null, true);
+    // Allow localhost in any form
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return cb(null, true);
+    // Allow hardcoded + env-configured origins
+    if ([...HARDCODED_ORIGINS, ...ENV_ORIGINS].includes(origin)) return cb(null, true);
+    // Allow carevale.co.in domains
+    if (origin.endsWith('.carevale.co.in') || origin === 'https://carevale.co.in') return cb(null, true);
     cb(new Error('Not allowed by CORS'));
   },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
@@ -30,9 +51,10 @@ app.use(cors({
   credentials: true,
 }));
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
 }));
